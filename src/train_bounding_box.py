@@ -1,9 +1,9 @@
 import verifiers as vf
-from transformers import Qwen3_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from transformers import Qwen3_VLForConditionalGeneration, AutoProcessor
 
 print("running verifier")
 model_name = "Qwen/Qwen3-VL-2B-Instruct"
-model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+model = Qwen3_VLForConditionalGeneration.from_pretrained(
     model_name, torch_dtype="auto", device_map="auto"
 )
 processor = AutoProcessor.from_pretrained(model_name)
