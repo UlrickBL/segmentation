@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elevation Labeler Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-main: #121212;
+            --bg-card: #1e1e1e;
+            --accent: #3b82f6;
+            --text-main: #e5e7eb;
+        }
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Inter', -apple-system, sans-serif;
+            overflow: hidden;
+        }
+        .canvas-container {
+            position: relative;
+            cursor: crosshair;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background-image: 
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1a1a1a 75%), 
+                linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        .bbox {
+            position: absolute;
+            border: 2px solid var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+            cursor: move;
+        }
+        .bbox.selected {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.15);
+            z-index: 10;
+        }
+        .handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border: 1px solid #000;
+            border-radius: 50%;
+        }
+        .handle-nw { top: -5px; left: -5px; cursor: nw-resize; }
+        .handle-ne { top: -5px; right: -5px; cursor: ne-resize; }
+        .handle-sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+        .handle-se { bottom: -5px; right: -5px; cursor: se-resize; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #121212; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <header class="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-zinc-900">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold tracking-tight text-white">Elevation<span class="text-blue-500">Labeller</span></h1>
+            <div class="h-6 w-[1px] bg-white/10"></div>
+            <div id="fileInfo" class="text-sm text-zinc-400 italic">No files loaded</div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="addBoxBtn" class="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-width="2" stroke-linecap="round"/></svg>
+                Add Window
+            </button>
+            <button id="exportBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">
+                Export JSON
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <aside class="w-72 bg-zinc-900 border-r border-white/10 flex flex-col">
+            <div class="p-4 space-y-4">
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Source Data</span>
+                    <input type="file" id="imageInput" accept="image/*" class="mt-2 block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"/>
+                </label>
+                <label class="block">
+                    <input type="file" id="jsonInput" accept=".json" class="mt-2 block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"/>
+                </label>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scroll p-4">
+                <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 block">Entities</span>
+                <div id="entityList" class="space-y-2">
+                    <div class="text-zinc-600 text-sm italic py-4 text-center">Load a JSON to see boxes</div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-white/10 bg-zinc-900/50">
+                <div class="flex justify-between text-xs text-zinc-500 mb-2">
+                    <span>Keyboard Shortcuts</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[10px] text-zinc-400">
+                    <div class="bg-zinc-800 p-1 rounded">DEL: Remove Selected</div>
+                    <div class="bg-zinc-800 p-1 rounded">ARROWS: Nudge</div>
+                </div>
+            </div>
+        </aside>
+
+        <section class="flex-1 overflow-auto p-8 flex items-center justify-center bg-zinc-950">
+            <div id="canvasContainer" class="canvas-container hidden">
+                <img id="mainImage" class="block max-w-none pointer-events-none select-none" src="" alt="Plan">
+            </div>
+            <div id="dropZone" class="text-center p-12 border-2 border-dashed border-zinc-800 rounded-2xl max-w-md">
+                <svg class="w-12 h-12 mx-auto text-zinc-700 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <h2 class="text-zinc-400 font-medium">Drop Elevation PNG & JSON here</h2>
+                <p class="text-zinc-600 text-sm mt-1">Or use the upload buttons in the sidebar</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const canvasContainer = document.getElementById('canvasContainer');
+        const mainImage = document.getElementById('mainImage');
+        const imageInput = document.getElementById('imageInput');
+        const jsonInput = document.getElementById('jsonInput');
+        const entityList = document.getElementById('entityList');
+        const fileInfo = document.getElementById('fileInfo');
+        const dropZone = document.getElementById('dropZone');
+        const addBoxBtn = document.getElementById('addBoxBtn');
+        const exportBtn = document.getElementById('exportBtn');
+
+        let boxes = [];
+        let selectedBoxIndex = null;
+        let isDragging = false;
+        let isResizing = false;
+        let activeHandle = null;
+        let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+        function init() {
+            imageInput.addEventListener('change', handleImageUpload);
+            jsonInput.addEventListener('change', handleJsonUpload);
+            addBoxBtn.addEventListener('click', addNewBox);
+            exportBtn.addEventListener('click', exportJson);
+            
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (selectedBoxIndex !== null) deleteBox(selectedBoxIndex);
+                }
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedBoxIndex !== null) {
+                    e.preventDefault();
+                    nudgeBox(e.key);
+                }
+            });
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                mainImage.src = event.target.result;
+                mainImage.onload = () => {
+                    canvasContainer.style.width = mainImage.width + 'px';
+                    canvasContainer.style.height = mainImage.height + 'px';
+                    canvasContainer.classList.remove('hidden');
+                    dropZone.classList.add('hidden');
+                    fileInfo.textContent = file.name;
+                    renderBoxes();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleJsonUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    boxes = data.map(item => ({
+                        label: item.label || 'window',
+                        bbox_2d: item.bbox_2d
+                    }));
+                    renderBoxes();
+                } catch (err) {
+                    alert("Invalid JSON format");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function addNewBox() {
+            if (!mainImage.src) return;
+            const newBox = {
+                label: 'window',
+                bbox_2d: [450, 450, 550, 550]
+            };
+            boxes.push(newBox);
+            selectedBoxIndex = boxes.length - 1;
+            renderBoxes();
+        }
+
+        function deleteBox(index) {
+            boxes.splice(index, 1);
+            selectedBoxIndex = null;
+            renderBoxes();
+        }
+
+        function nudgeBox(key) {
+            const box = boxes[selectedBoxIndex];
+            const step = 1;
+            if (key === 'ArrowUp') { box.bbox_2d[1] -= step; box.bbox_2d[3] -= step; }
+            if (key === 'ArrowDown') { box.bbox_2d[1] += step; box.bbox_2d[3] += step; }
+            if (key === 'ArrowLeft') { box.bbox_2d[0] -= step; box.bbox_2d[2] -= step; }
+            if (key === 'ArrowRight') { box.bbox_2d[0] += step; box.bbox_2d[2] += step; }
+            renderBoxes();
+        }
+
+        function renderBoxes() {
+            const existingBboxes = canvasContainer.querySelectorAll('.bbox');
+            existingBboxes.forEach(b => b.remove());
+            entityList.innerHTML = '';
+
+            const imgW = mainImage.width;
+            const imgH = mainImage.height;
+
+            boxes.forEach((box, index) => {
+                const item = document.createElement('div');
+                item.className = `p-3 rounded-lg border cursor-pointer transition flex justify-between items-center ${selectedBoxIndex === index ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-zinc-800 border-transparent text-zinc-400 hover:bg-zinc-750'}`;
+                item.innerHTML = `
+                    <div class="flex flex-col">
+                        <span class="text-xs font-bold uppercase">${box.label} #${index + 1}</span>
+                        <span class="text-[10px] opacity-60">Pos: ${box.bbox_2d.join(', ')}</span>
+                    </div>
+                    <button onclick="event.stopPropagation(); deleteBox(${index})" class="text-zinc-500 hover:text-red-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                `;
+                item.onclick = () => { selectedBoxIndex = index; renderBoxes(); };
+                entityList.appendChild(item);
+
+                const div = document.createElement('div');
+                div.className = `bbox ${selectedBoxIndex === index ? 'selected' : ''}`;
+                
+                const left = (box.bbox_2d[0] / 1000) * imgW;
+                const top = (box.bbox_2d[1] / 1000) * imgH;
+                const right = (box.bbox_2d[2] / 1000) * imgW;
+                const bottom = (box.bbox_2d[3] / 1000) * imgH;
+
+                div.style.left = left + 'px';
+                div.style.top = top + 'px';
+                div.style.width = (right - left) + 'px';
+                div.style.height = (bottom - top) + 'px';
+
+                if (selectedBoxIndex === index) {
+                    ['nw', 'ne', 'sw', 'se'].forEach(dir => {
+                        const h = document.createElement('div');
+                        h.className = `handle handle-${dir}`;
+                        h.onmousedown = (e) => startResize(e, index, dir);
+                        div.appendChild(h);
+                    });
+                }
+
+                div.onmousedown = (e) => {
+                    if (e.target.classList.contains('handle')) return;
+                    startMove(e, index);
+                };
+
+                canvasContainer.appendChild(div);
+            });
+        }
+
+        function startMove(e, index) {
+            e.stopPropagation();
+            selectedBoxIndex = index;
+            renderBoxes();
+            isDragging = true;
+            const box = boxes[index];
+            startX = e.clientX;
+            startY = e.clientY;
+            const imgW = mainImage.width;
+            const imgH = mainImage.height;
+            startLeft = (box.bbox_2d[0] / 1000) * imgW;
+            startTop = (box.bbox_2d[1] / 1000) * imgH;
+            
+            document.onmousemove = (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const newLeft = startLeft + dx;
+                const newTop = startTop + dy;
+                
+                const w = (box.bbox_2d[2] - box.bbox_2d[0]) / 1000 * imgW;
+                const h = (box.bbox_2d[3] - box.bbox_2d[1]) / 1000 * imgH;
+
+                updateBoxCoords(index, newLeft, newTop, newLeft + w, newTop + h);
+                renderBoxes();
+            };
+
+            document.onmouseup = () => {
+                isDragging = false;
+                document.onmousemove = null;
+            };
+        }
+
+        function startResize(e, index, dir) {
+            e.stopPropagation();
+            isResizing = true;
+            activeHandle = dir;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const box = boxes[index];
+            const imgW = mainImage.width;
+            const imgH = mainImage.height;
+
+            startLeft = (box.bbox_2d[0] / 1000) * imgW;
+            startTop = (box.bbox_2d[1] / 1000) * imgH;
+            startWidth = ((box.bbox_2d[2] - box.bbox_2d[0]) / 1000) * imgW;
+            startHeight = ((box.bbox_2d[3] - box.bbox_2d[1]) / 1000) * imgH;
+
+            document.onmousemove = (e) => {
+                if (!isResizing) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                let nl = startLeft, nt = startTop, nw = startWidth, nh = startHeight;
+
+                if (dir.includes('n')) { nt += dy; nh -= dy; }
+                if (dir.includes('s')) { nh += dy; }
+                if (dir.includes('w')) { nl += dx; nw -= dx; }
+                if (dir.includes('e')) { nw += dx; }
+
+                updateBoxCoords(index, nl, nt, nl + nw, nt + nh);
+                renderBoxes();
+            };
+
+            document.onmouseup = () => {
+                isResizing = false;
+                document.onmousemove = null;
+            };
+        }
+
+        function updateBoxCoords(index, x1, y1, x2, y2) {
+            const imgW = mainImage.width;
+            const imgH = mainImage.height;
+
+            let rx1 = Math.min(x1, x2);
+            let rx2 = Math.max(x1, x2);
+            let ry1 = Math.min(y1, y2);
+            let ry2 = Math.max(y1, y2);
+
+            boxes[index].bbox_2d = [
+                Math.round((rx1 / imgW) * 1000),
+                Math.round((ry1 / imgH) * 1000),
+                Math.round((rx2 / imgW) * 1000),
+                Math.round((ry2 / imgH) * 1000)
+            ];
+        }
+
+        function exportJson() {
+            if (boxes.length === 0) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(boxes, null, 4));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "elevation_updated.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        init();
+    </script>
+</body>
+</html>
