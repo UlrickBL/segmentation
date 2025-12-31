@@ -8,11 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #f3f4f6; font-family: sans-serif; }
-        #canvas-container { width: 100%; height: 75vh; background: white; position: relative; border-bottom: 2px solid #e5e7eb; }
+        #canvas-container { width: 100%; height: 70vh; background: white; position: relative; border-bottom: 2px solid #e5e7eb; }
         canvas { display: block; width: 100% !important; height: 100% !important; }
         .controls { padding: 20px; max-width: 1200px; margin: 0 auto; display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap; }
-        .log-container { background: #1f2937; color: #10b981; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 11px; height: 80px; overflow-y: auto; width: 100%; max-width: 1200px; margin: 0 auto 10px auto; }
-        .badge { background: #374151; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 10px; margin-left: 5px; }
+        .log-container { background: #111827; color: #10b981; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 11px; height: 100px; overflow-y: auto; width: 100%; max-width: 1200px; margin: 10px auto; border: 1px solid #374151; }
     </style>
 </head>
 <body>
@@ -25,10 +24,13 @@
 
 <div class="controls">
     <button id="btn-sample" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg transform active:scale-95">
-        Sample Complex Building
+        Sample New Building
     </button>
-    <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg transform active:scale-95">
-        Export PNG + JSON
+    <button id="btn-save" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg transform active:scale-95 flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+        </svg>
+        Save PNG + JSON Pair
     </button>
 </div>
 
@@ -76,11 +78,7 @@
 
     function createBoxWithOutline(w, h, zPos = 0, color = 0xffffff, outlineColor = 0x999999, textureType = 'none') {
         const group = new THREE.Group();
-        
-        const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(w, h),
-            new THREE.MeshBasicMaterial({ color: color })
-        );
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: color }));
         group.add(mesh);
 
         if (textureType !== 'none') {
@@ -88,19 +86,16 @@
             if (textureType === 'siding') {
                 for (let y = -h/2 + 0.3; y < h/2; y += 0.4) {
                     const pts = [new THREE.Vector3(-w/2, y, 0.005), new THREE.Vector3(w/2, y, 0.005)];
-                    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat);
-                    group.add(line);
+                    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat));
                 }
             } else if (textureType === 'blocks') {
                 for (let y = -h/2 + 0.8; y < h/2; y += 0.8) {
                     const pts = [new THREE.Vector3(-w/2, y, 0.005), new THREE.Vector3(w/2, y, 0.005)];
-                    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat);
-                    group.add(line);
+                    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat));
                 }
                 for (let x = -w/2 + 1; x < w/2; x += 1.5) {
                     const pts = [new THREE.Vector3(x, -h/2, 0.005), new THREE.Vector3(x, h/2, 0.005)];
-                    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat);
-                    group.add(line);
+                    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), patternMat));
                 }
             }
         }
@@ -114,7 +109,7 @@
         return group;
     }
 
-    function createWindow(x, y, w, h, type, details, zPos = 0.1) {
+    function createWindow(x, y, w, h, type, details) {
         let geo;
         if (type === 'circle') {
             geo = new THREE.CircleGeometry(w/2, 32);
@@ -131,17 +126,17 @@
         }
 
         const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
-        mesh.position.set(x, y, zPos);
+        mesh.position.set(x, y, 0.1);
         buildingGroup.add(mesh);
 
         const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x888888 }));
-        outline.position.set(x, y, zPos + 0.01);
+        outline.position.set(x, y, 0.11);
         buildingGroup.add(outline);
 
         if (details && type !== 'circle') {
             const gridMat = new THREE.LineBasicMaterial({ color: 0xcccccc });
-            const ptsH = [new THREE.Vector3(x - w/2, y, zPos + 0.02), new THREE.Vector3(x + w/2, y, zPos + 0.02)];
-            const ptsV = [new THREE.Vector3(x, y - h/2, zPos + 0.02), new THREE.Vector3(x, y + h/2, zPos + 0.02)];
+            const ptsH = [new THREE.Vector3(x - w/2, y, 0.12), new THREE.Vector3(x + w/2, y, 0.12)];
+            const ptsV = [new THREE.Vector3(x, y - h/2, 0.12), new THREE.Vector3(x, y + h/2, 0.12)];
             buildingGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsH), gridMat));
             buildingGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsV), gridMat));
         }
@@ -160,62 +155,17 @@
         mainBody.position.y = (floors * fH) / 2;
         buildingGroup.add(mainBody);
 
-        const hasLeftWing = Math.random() > 0.4;
-        const hasRightWing = Math.random() > 0.4;
-
-        if (hasLeftWing) {
+        if (Math.random() > 0.4) {
             const wingW = 4 + Math.random() * 3;
-            const wingFloors = Math.max(1, floors - Math.floor(Math.random() * 2) - 1);
+            const wingFloors = Math.max(1, floors - 1);
             const wing = createBoxWithOutline(wingW, wingFloors * fH, -0.1, 0xffffff, 0x666666, texture);
             wing.position.set(-mainW/2 - wingW/2, (wingFloors * fH) / 2, 0);
             buildingGroup.add(wing);
             addWindowsToSection(-mainW/2 - wingW/2, wingFloors, wingW, fH, true);
         }
 
-        if (hasRightWing) {
-            const isGarage = Math.random() > 0.5;
-            const wingW = 5 + Math.random() * 2;
-            const wingFloors = isGarage ? 1 : Math.max(1, floors - 1);
-            const wing = createBoxWithOutline(wingW, wingFloors * fH, -0.1, 0xffffff, 0x666666, texture);
-            wing.position.set(mainW/2 + wingW/2, (wingFloors * fH) / 2, 0);
-            buildingGroup.add(wing);
-
-            if (isGarage) {
-                const gW = wingW * 0.7;
-                const gH = 2.2;
-                const gDoor = createBoxWithOutline(gW, gH, 0.1, 0xfafafa, 0x999999, 'siding');
-                gDoor.position.set(mainW/2 + wingW/2, gH/2, 0);
-                buildingGroup.add(gDoor);
-            } else {
-                addWindowsToSection(mainW/2 + wingW/2, wingFloors, wingW, fH, false);
-            }
-        }
-
-        const roofType = ['flat', 'pitched', 'angled'][Math.floor(Math.random() * 3)];
-        if (roofType !== 'flat') {
-            const rH = 1.5 + Math.random() * 2.5;
-            const roofShape = new THREE.Shape();
-            if (roofType === 'pitched') {
-                roofShape.moveTo(-mainW/2, 0);
-                roofShape.lineTo(mainW/2, 0);
-                roofShape.lineTo(0, rH);
-            } else {
-                roofShape.moveTo(-mainW/2, 0);
-                roofShape.lineTo(mainW/2, 0);
-                roofShape.lineTo(mainW/2, rH);
-            }
-            const roof = new THREE.Mesh(new THREE.ShapeGeometry(roofShape), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-            roof.position.y = floors * fH;
-            buildingGroup.add(roof);
-            const rOutline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.ShapeGeometry(roofShape)), new THREE.LineBasicMaterial({ color: 0x666666 }));
-            rOutline.position.y = floors * fH;
-            rOutline.position.z = 0.01;
-            buildingGroup.add(rOutline);
-        }
-
         addWindowsToSection(0, floors, mainW, fH, false, true);
-
-        log(`Complex building sampled: ${floors} floors, ${texture} texture, ${roofType} roof.`);
+        log(`Generated: ${floors} floors, ${texture} style.`);
     }
 
     function addWindowsToSection(centerX, floorCount, sectionW, floorH, forceAsym, hasMainDoor = false) {
@@ -224,29 +174,22 @@
         const winScale = 0.5 + Math.random() * 0.4;
         const winW = (winType === 'tall' ? 0.6 : 1.2) * winScale;
         const winH = (winType === 'tall' ? 1.8 : 1.2) * winScale;
-
         const cols = Math.max(1, Math.floor(sectionW / 2.5));
         const spacing = sectionW / (cols + 1);
 
         for (let f = 0; f < floorCount; f++) {
             const y = (f * floorH) + (floorH / 2);
             const isGround = (f === 0);
-
             const skipProb = forceAsym ? 0.3 : 0.05;
 
             for (let c = 0; c < cols; c++) {
                 if (Math.random() < skipProb) continue;
-
                 const x = centerX - (sectionW/2) + (spacing * (c + 1));
-                
                 if (isGround && hasMainDoor && c === Math.floor(cols/2)) {
                     const dW = 1.2, dH = 2.2;
                     const door = createBoxWithOutline(dW, dH, 0.1, 0xffffff, 0x777777, 'none');
                     door.position.set(x, dH/2, 0);
                     buildingGroup.add(door);
-                    const knob = new THREE.Mesh(new THREE.CircleGeometry(0.05, 8), new THREE.MeshBasicMaterial({color: 0x999999}));
-                    knob.position.set(x + 0.4, dH/2, 0.15);
-                    buildingGroup.add(knob);
                 } else {
                     createWindow(x, y, winW, winH, winType, useDetails);
                 }
@@ -254,56 +197,49 @@
         }
     }
 
-    function getBoundingBoxes() {
-        const bboxes = [];
-        windowObjects.forEach(obj => {
+    async function savePair() {
+        renderer.render(scene, camera);
+        const imgData = renderer.domElement.toDataURL("image/png");
+
+        const bboxes = windowObjects.map(obj => {
             const box = new THREE.Box3().setFromObject(obj);
             const min = box.min.clone().project(camera);
             const max = box.max.clone().project(camera);
-            
-            // Normalized 0-1000 coordinates
-            const x1 = Math.round(((min.x + 1) / 2) * 1000);
-            const x2 = Math.round(((max.x + 1) / 2) * 1000);
-            const y1 = Math.round(((1 - max.y) / 2) * 1000); 
-            const y2 = Math.round(((1 - min.y) / 2) * 1000);
-
-            bboxes.push({
-                "bbox_2d": [x1, y1, x2, y2],
-                "label": "window"
-            });
+            return {
+                bbox_2d: [
+                    Math.round(((min.x + 1) / 2) * 1000),
+                    Math.round(((1 - max.y) / 2) * 1000),
+                    Math.round(((max.x + 1) / 2) * 1000),
+                    Math.round(((1 - min.y) / 2) * 1000)
+                ],
+                label: "window"
+            };
         });
-        return bboxes;
-    }
 
-    function exportData() {
-        renderer.render(scene, camera);
-        const imgData = renderer.domElement.toDataURL("image/png");
-        const bboxes = getBoundingBoxes();
-        const jsonStr = JSON.stringify(bboxes, null, 4);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const baseName = `synthetic_elevation_${timestamp}`;
 
-        const timestamp = new Date().getTime();
-        downloadFile(imgData, `elevation_${timestamp}.png`);
-        downloadFile("data:text/json;charset=utf-8," + encodeURIComponent(jsonStr), `metadata_${timestamp}.json`);
-        
-        log(`<span class="text-emerald-400">Exported ${bboxes.length} window annotations.</span>`);
-    }
+        // 1. Save Image
+        const imgLink = document.createElement('a');
+        imgLink.href = imgData;
+        imgLink.download = `${baseName}.png`;
+        imgLink.click();
 
-    function downloadFile(dataUrl, filename) {
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // 2. Save JSON
+        const jsonContent = JSON.stringify(bboxes, null, 4);
+        const blob = new Blob([jsonContent], { type: 'application/json' });
+        const jsonLink = document.createElement('a');
+        jsonLink.href = URL.createObjectURL(blob);
+        jsonLink.download = `${baseName}.json`;
+        jsonLink.click();
+
+        log(`Saved locally: <b>${baseName}</b> .png and .json`);
     }
 
     function animate() {
         requestAnimationFrame(animate);
         renderer.render(scene, camera);
     }
-
-    document.getElementById('btn-sample').addEventListener('click', generateBuilding);
-    document.getElementById('btn-export').addEventListener('click', exportData);
 
     window.addEventListener('resize', () => {
         const aspect = container.clientWidth / container.clientHeight;
@@ -313,6 +249,9 @@
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
     });
+
+    document.getElementById('btn-sample').addEventListener('click', generateBuilding);
+    document.getElementById('btn-save').addEventListener('click', savePair);
 
     init();
 </script>
