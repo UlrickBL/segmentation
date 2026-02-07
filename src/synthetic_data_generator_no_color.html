@@ -4,51 +4,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monochrome Plan Generator</title>
+    <title>Diverse Elevation Architect</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #f8fafc;
-            font-family: sans-serif;
+            background-color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
         }
 
         #canvas-container {
             width: 100%;
-            height: 75vh;
-            background: white;
-            border-bottom: 2px solid #000;
+            height: 70vh;
+            background: #ffffff;
+            border-bottom: 2px solid #e2e8f0;
         }
 
-        .controls {
-            padding: 20px;
-            display: flex;
-            gap: 15px;
-            justify-content: center;
+        canvas {
+            display: block;
         }
 
         .log-container {
-            background: #000;
-            color: #34d399;
-            padding: 10px;
-            border-radius: 4px;
+            background: #0f172a;
+            color: #38bdf8;
+            padding: 15px;
+            border-radius: 12px;
             font-family: monospace;
             font-size: 11px;
-            height: 60px;
+            height: 100px;
             overflow-y: auto;
-            width: 90%;
-            margin: 0 auto;
+            width: 95%;
+            margin: 10px auto;
         }
 
-        button {
-            transition: all 0.1s ease;
-            border: 2px solid black;
-        }
-
-        button:active {
-            transform: scale(0.95);
+        .controls {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
         }
     </style>
 </head>
@@ -56,13 +51,15 @@
 <body>
 
     <div id="canvas-container"></div>
-    <div id="log" class="log-container">> Technical Monochrome Engine Online.</div>
+    <div id="log" class="log-container">> Architect standing by.</div>
 
     <div class="controls">
-        <button id="btn-sample" class="bg-white hover:bg-black hover:text-white font-bold py-2 px-8">Generate New
-            Plan</button>
-        <button id="btn-export" class="bg-white hover:bg-black hover:text-white font-bold py-2 px-8">Export PNG +
-            JSON</button>
+        <button id="btn-sample"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-md">Generate
+            Unique Building</button>
+        <button id="btn-export"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-md">Export
+            Data</button>
     </div>
 
     <script>
@@ -70,14 +67,18 @@
         let windowObjects = [];
         const container = document.getElementById('canvas-container');
 
-        const COLOR_WALL = 0xffffff;
-        const COLOR_LINE = 0x000000;
+        const PALETTES = [
+            { wall: 0xffffff, accent: 0xffffff, window: 0xffffff }, // Modern White
+            // { wall: 0xfafaf9, accent: 0x78350f, window: 0xd6d3d1 }, // Warm Farmhouse
+            // { wall: 0x475569, accent: 0x0f172a, window: 0x94a3b8 }, // Industrial Slate
+            // { wall: 0xfee2e2, accent: 0x991b1b, window: 0xffffff }  // Classic Brickish
+        ];
 
         function log(msg) {
-            const div = document.createElement('div');
-            div.innerHTML = `> ${msg}`;
             const logEl = document.getElementById('log');
-            logEl.appendChild(div);
+            const entry = document.createElement('div');
+            entry.innerHTML = `> ${msg}`;
+            logEl.appendChild(entry);
             logEl.scrollTop = logEl.scrollHeight;
         }
 
@@ -85,18 +86,16 @@
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xffffff);
             camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
-
             renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
-
-            scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+            scene.add(new THREE.AmbientLight(0xffffff, 1.2));
             generate();
             animate();
         }
 
-        function createShape(pts, color, z) {
+        function createShape(pts, color, z, outlineColor = 0x000000) {
             const shape = new THREE.Shape();
             shape.moveTo(pts[0].x, pts[0].y);
             for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
@@ -107,12 +106,12 @@
             mesh.position.z = z;
             group.add(mesh);
 
-            const outline = new THREE.LineSegments(
+            const edges = new THREE.LineSegments(
                 new THREE.EdgesGeometry(new THREE.ShapeGeometry(shape)),
-                new THREE.LineBasicMaterial({ color: COLOR_LINE, linewidth: 2 })
+                new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 })
             );
-            outline.position.z = z + 0.01;
-            group.add(outline);
+            edges.position.z = z + 0.01;
+            group.add(edges);
             return group;
         }
 
@@ -122,81 +121,98 @@
             scene.add(buildingGroup);
             windowObjects = [];
 
+            const palette = PALETTES[Math.floor(Math.random() * PALETTES.length)];
             let cursorX = 0;
-            const numSections = 2 + Math.floor(Math.random() * 2);
+
+            // --- 1. GENERATE VOLUMES ---
+            const sections = [];
+            const numSections = 2 + Math.floor(Math.random() * 2); // 2 to 3 main volumes
 
             for (let i = 0; i < numSections; i++) {
-                const w = 5 + Math.random() * 8;
-                const h = 3 + Math.random() * 7;
-                const z = i * -0.2;
+                const width = 4 + Math.random() * 6;
+                const height = 3 + Math.random() * 9;
+                const z = i * -0.5; // Layering
 
-                // Wall section
+                sections.push({ x: cursorX, w: width, h: height, z: z });
+
+                // Wall
                 const wall = createShape([
-                    { x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }
-                ], COLOR_WALL, z);
+                    { x: 0, y: 0 }, { x: width, y: 0 }, { x: width, y: height }, { x: 0, y: height }
+                ], palette.wall, z, palette.accent);
                 wall.position.set(cursorX, 0, 0);
                 buildingGroup.add(wall);
 
-                // Roof (Varied styles)
-                const rH = 1.5 + Math.random() * 2.5;
-                const isGable = Math.random() > 0.4;
-                let roof;
-                if (isGable) {
-                    roof = createShape([{ x: -0.3, y: 0 }, { x: w + 0.3, y: 0 }, { x: w / 2, y: rH }], COLOR_WALL, z - 0.05);
+                // --- 2. ROOFS ---
+                const rH = 1.5 + Math.random() * 3;
+                const roofType = Math.random() > 0.4 ? 'gable' : 'flat';
+                if (roofType === 'gable') {
+                    const roof = createShape([
+                        { x: -0.5, y: 0 }, { x: width + 0.5, y: 0 }, { x: width / 2, y: rH }
+                    ], 0xffffff, z - 0.1, 0x000000);
+                    roof.position.set(cursorX, height, 0);
+                    buildingGroup.add(roof);
                 } else {
-                    roof = createShape([{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: 0.4 }, { x: 0, y: 0.4 }], COLOR_WALL, z - 0.05);
+                    const slab = createShape([
+                        { x: -0.2, y: 0 }, { x: width + 0.2, y: 0 }, { x: width + 0.2, y: 0.4 }, { x: -0.2, y: 0.4 }
+                    ], palette.accent, z + 0.1, 0x000000);
+                    slab.position.set(cursorX, height, 0);
+                    buildingGroup.add(slab);
                 }
-                roof.position.set(cursorX, h, 0);
-                buildingGroup.add(roof);
 
-                // Windows
-                const rows = Math.max(1, Math.floor(h / 3));
-                const cols = Math.max(1, Math.floor(w / 2.5));
+                // --- 3. WINDOWS & DOORS ---
+                const rows = Math.max(1, Math.floor(height / 3.5));
+                const cols = Math.max(1, Math.floor(width / 2.5));
+                const winStyle = Math.random() > 0.6 ? 'arch' : 'rect';
+
                 for (let r = 0; r < rows; r++) {
                     for (let c = 0; c < cols; c++) {
-                        const wx = cursorX + (w / (cols + 1)) * (c + 1);
-                        const wy = (h / (rows + 1)) * (r + 1);
+                        const winW = 1.2, winH = 1.6;
+                        const wx = cursorX + (width / (cols + 1)) * (c + 1);
+                        const wy = (height / (rows + 1)) * (r + 1);
 
+                        // Randomly skip window for a door on ground floor
                         if (r === 0 && c === Math.floor(cols / 2) && i === 0) {
-                            const door = createShape([{ x: -0.8, y: 0 }, { x: 0.8, y: 0 }, { x: 0.8, y: 2.4 }, { x: -0.8, y: 2.4 }], COLOR_WALL, z + 0.05);
+                            const door = createShape([
+                                { x: -0.7, y: 0 }, { x: 0.7, y: 0 }, { x: 0.7, y: 2.2 }, { x: -0.7, y: 2.2 }
+                            ], palette.accent, z + 0.2, 0x000000);
                             door.position.set(wx, 0, 0);
                             buildingGroup.add(door);
                         } else {
-                            addWindow(wx, wy, 1.2, 1.6, z + 0.05);
+                            addWindow(wx, wy, winW, winH, winStyle, z + 0.2, palette.window);
                         }
                     }
                 }
-                cursorX += w;
+                cursorX += width;
             }
+
+            // --- 4. DETAILS (Chimney) ---
+            if (Math.random() > 0.5) {
+                const chimney = createShape([{ x: 0, y: 0 }, { x: 1.2, y: 0 }, { x: 1.2, y: 3 }, { x: 0, y: 3 }], palette.accent, -2);
+                chimney.position.set(sections[0].x + 1, sections[0].h, 0);
+                buildingGroup.add(chimney);
+            }
+
             fitCamera();
+            log("Generated diverse multi-volume structure.");
         }
 
-        function addWindow(x, y, w, h, z) {
-            const style = Math.random() > 0.8 ? 'arch' : 'rect';
-            let geo;
-            if (style === 'arch') {
+        function addWindow(x, y, w, h, type, z, color) {
+            let geo = (type === 'arch') ? new THREE.CircleGeometry(w / 2, 32) : new THREE.PlaneGeometry(w, h);
+            // Arch geometry adjustment
+            if (type === 'arch') {
                 const s = new THREE.Shape();
                 s.moveTo(-w / 2, -h / 2); s.lineTo(w / 2, -h / 2); s.lineTo(w / 2, h / 4);
                 s.absarc(0, h / 4, w / 2, 0, Math.PI, false); s.lineTo(-w / 2, -h / 2);
                 geo = new THREE.ShapeGeometry(s);
-            } else {
-                geo = new THREE.PlaneGeometry(w, h);
             }
 
-            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
             mesh.position.set(x, y, z);
             buildingGroup.add(mesh);
 
-            const outline = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000 }));
-            outline.position.set(x, y, z + 0.01);
-            buildingGroup.add(outline);
-
-            if (style === 'rect') {
-                const ptsH = [new THREE.Vector3(x - w / 2, y, z + 0.02), new THREE.Vector3(x + w / 2, y, z + 0.02)];
-                const ptsV = [new THREE.Vector3(x, y - h / 2, z + 0.02), new THREE.Vector3(x, y + h / 2, z + 0.02)];
-                buildingGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsH), new THREE.LineBasicMaterial({ color: 0x000000 })));
-                buildingGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsV), new THREE.LineBasicMaterial({ color: 0x000000 })));
-            }
+            const frame = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000 }));
+            frame.position.set(x, y, z + 0.01);
+            buildingGroup.add(frame);
             windowObjects.push(mesh);
         }
 
@@ -217,42 +233,47 @@
 
         function exportFiles() {
             renderer.render(scene, camera);
-            const timestamp = Date.now();
 
-            // PNG Export
-            const imgData = renderer.domElement.toDataURL("image/png");
-            downloadLink(imgData, `elevation_${timestamp}.png`);
+            // 1. Capture a single timestamp to use for BOTH files
+            const exportId = Date.now();
 
-            // JSON Export
+            const img = renderer.domElement.toDataURL("image/png");
             const bboxes = windowObjects.map(obj => {
                 const box = new THREE.Box3().setFromObject(obj);
                 const min = box.min.clone().project(camera);
                 const max = box.max.clone().project(camera);
                 return {
                     "bbox_2d": [
-                        Math.round(((min.x + 1) / 2) * 1000), Math.round(((1 - max.y) / 2) * 1000),
-                        Math.round(((max.x + 1) / 2) * 1000), Math.round(((1 - min.y) / 2) * 1000)
+                        Math.round(((min.x + 1) / 2) * 1000),
+                        Math.round(((1 - max.y) / 2) * 1000),
+                        Math.round(((max.x + 1) / 2) * 1000),
+                        Math.round(((1 - min.y) / 2) * 1000)
                     ],
                     "label": "window"
                 };
             });
-            const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bboxes, null, 2));
-            downloadLink(jsonStr, `metadata_${timestamp}.json`);
 
-            log(`Auto-downloaded elevation_${timestamp}.png and metadata.`);
-        }
+            const dl = (u, n) => {
+                const a = document.createElement('a');
+                a.href = u;
+                a.download = n;
+                a.click();
+            };
 
-        function downloadLink(url, name) {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = name;
-            a.click();
+            // 2. Use the exact same exportId for both filenames
+            dl(img, `elevation_${exportId}.png`);
+            dl("data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bboxes)), `meta_${exportId}.json`);
+
+            log(`Exported set ID: ${exportId}`);
         }
 
         function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
-        window.addEventListener('resize', () => { renderer.setSize(container.clientWidth, container.clientHeight); fitCamera(); });
         document.getElementById('btn-sample').addEventListener('click', generate);
         document.getElementById('btn-export').addEventListener('click', exportFiles);
+        window.addEventListener('resize', () => {
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            fitCamera();
+        });
 
         init();
     </script>

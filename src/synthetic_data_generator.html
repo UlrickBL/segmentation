@@ -233,6 +233,10 @@
 
         function exportFiles() {
             renderer.render(scene, camera);
+
+            // 1. Capture a single timestamp to use for BOTH files
+            const exportId = Date.now();
+
             const img = renderer.domElement.toDataURL("image/png");
             const bboxes = windowObjects.map(obj => {
                 const box = new THREE.Box3().setFromObject(obj);
@@ -240,15 +244,27 @@
                 const max = box.max.clone().project(camera);
                 return {
                     "bbox_2d": [
-                        Math.round(((min.x + 1) / 2) * 1000), Math.round(((1 - max.y) / 2) * 1000),
-                        Math.round(((max.x + 1) / 2) * 1000), Math.round(((1 - min.y) / 2) * 1000)
+                        Math.round(((min.x + 1) / 2) * 1000),
+                        Math.round(((1 - max.y) / 2) * 1000),
+                        Math.round(((max.x + 1) / 2) * 1000),
+                        Math.round(((1 - min.y) / 2) * 1000)
                     ],
                     "label": "window"
                 };
             });
-            const dl = (u, n) => { const a = document.createElement('a'); a.href = u; a.download = n; a.click(); };
-            dl(img, `elevation_${Date.now()}.png`);
-            dl("data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bboxes)), `meta_${Date.now()}.json`);
+
+            const dl = (u, n) => {
+                const a = document.createElement('a');
+                a.href = u;
+                a.download = n;
+                a.click();
+            };
+
+            // 2. Use the exact same exportId for both filenames
+            dl(img, `elevation_${exportId}.png`);
+            dl("data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bboxes)), `meta_${exportId}.json`);
+
+            log(`Exported set ID: ${exportId}`);
         }
 
         function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
