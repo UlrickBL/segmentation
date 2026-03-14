@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Grounding Data Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #canvas-wrapper {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #1e293b;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: white;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-width: 100%;
+            max-height: 100%;
+            cursor: crosshair;
+        }
+
+        .controls {
+            background: #0f172a;
+            border-top: 1px solid #334155;
+            padding: 20px;
+        }
+
+        .question-box {
+            background: #1e293b;
+            border-left: 4px solid #38bdf8;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="canvas-wrapper">
+        <canvas id="mainCanvas" width="1000" height="1000"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="max-w-4xl mx-auto">
+            <div id="questionDisplay" class="question-box">
+                Loading grounding task...
+            </div>
+
+            <div class="flex flex-wrap gap-4 justify-between items-center">
+                <div class="flex gap-3">
+                    <button id="btn-generate"
+                        class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                        New Sample
+                    </button>
+                    <button id="btn-export"
+                        class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        Export (PNG + JSON)
+                    </button>
+                </div>
+                
+                <div id="stat-display" class="text-slate-400 text-sm italic">
+                    Coordinates: [1000 x 1000] normalized
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const questionDisplay = document.getElementById('questionDisplay');
+        const statDisplay = document.getElementById('stat-display');
+
+        const COLORS = [
+            { name: 'red', hex: '#ef4444' },
+            { name: 'blue', hex: '#3b82f6' },
+            { name: 'green', hex: '#22c55e' },
+            { name: 'yellow', hex: '#eab308' },
+            { name: 'purple', hex: '#a855f7' },
+            { name: 'orange', hex: '#f97316' },
+            { name: 'pink', hex: '#ec4899' },
+            { name: 'cyan', hex: '#06b6d4' }
+        ];
+
+        const SHAPES = ['circle', 'square', 'triangle'];
+        const SIZES = [
+            { name: 'small', val: 25 },
+            { name: 'medium', val: 50 },
+            { name: 'large', val: 85 }
+        ];
+
+        let currentShapes = [];
+        let targetShape = null;
+        let currentQuestion = "";
+
+        // Check if a new shape overlaps with any existing shapes
+        function checkCollision(newShape, shapes) {
+            const buffer = 20; // Minimum distance between shapes
+            for (const s of shapes) {
+                const dx = newShape.x - s.x;
+                const dy = newShape.y - s.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                // Radius-based collision check
+                if (distance < (newShape.size.val + s.size.val + buffer)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function generate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            currentShapes = [];
+            // Random number of objects between 1 and 15
+            const targetCount = Math.floor(Math.random() * 15) + 1; 
+            
+            let attempts = 0;
+            const maxAttempts = 1000; // Increased attempts to handle denser canvases
+
+            while (currentShapes.length < targetCount && attempts < maxAttempts) {
+                attempts++;
+                
+                const shapeType = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+                const colorObj = COLORS[Math.floor(Math.random() * COLORS.length)];
+                const sizeObj = SIZES[Math.floor(Math.random() * SIZES.length)];
+                
+                const padding = 100;
+                const x = padding + Math.random() * (canvas.width - padding * 2);
+                const y = padding + Math.random() * (canvas.height - padding * 2);
+
+                const newShape = {
+                    type: shapeType,
+                    color: colorObj,
+                    size: sizeObj,
+                    x: x,
+                    y: y
+                };
+
+                if (!checkCollision(newShape, currentShapes)) {
+                    currentShapes.push(newShape);
+                }
+            }
+
+            // Draw them
+            currentShapes.forEach(drawShape);
+
+            // Select a target
+            targetShape = currentShapes[Math.floor(Math.random() * currentShapes.length)];
+            
+            const templates = [
+                `Point the ${targetShape.color.name} ${targetShape.type}.`,
+                `Click on the ${targetShape.size.name} ${targetShape.color.name} object.`,
+                `Where is the ${targetShape.size.name} ${targetShape.type}?`,
+                `Point to the ${targetShape.color.name} ${targetShape.size.name} ${targetShape.type}.`,
+                `Locate the ${targetShape.type} that is ${targetShape.color.name}.`
+            ];
+            
+            currentQuestion = templates[Math.floor(Math.random() * templates.length)];
+            questionDisplay.innerText = currentQuestion;
+            statDisplay.innerText = `Objects: ${currentShapes.length} | Center: [${Math.round((targetShape.x / canvas.width) * 1000)}, ${Math.round((targetShape.y / canvas.height) * 1000)}]`;
+        }
+
+        function drawShape(s) {
+            ctx.fillStyle = s.color.hex;
+            ctx.beginPath();
+
+            if (s.type === 'circle') {
+                ctx.arc(s.x, s.y, s.size.val, 0, Math.PI * 2);
+            } else if (s.type === 'square') {
+                ctx.rect(s.x - s.size.val, s.y - s.size.val, s.size.val * 2, s.size.val * 2);
+            } else if (s.type === 'triangle') {
+                ctx.moveTo(s.x, s.y - s.size.val);
+                ctx.lineTo(s.x - s.size.val, s.y + s.size.val);
+                ctx.lineTo(s.x + s.size.val, s.y + s.size.val);
+                ctx.closePath();
+            }
+            
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function exportData() {
+            const timestamp = Date.now();
+            const imgData = canvas.toDataURL("image/png");
+            downloadFile(imgData, `task_${timestamp}.png`);
+
+            const exportJson = {
+                "question": currentQuestion,
+                "point_2d": [
+                    Math.round((targetShape.x / canvas.width) * 1000),
+                    Math.round((targetShape.y / canvas.height) * 1000)
+                ],
+                "label": "click"
+            };
+
+            const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportJson, null, 2));
+            downloadFile(jsonStr, `grounding_${timestamp}.json`);
+        }
+
+        function downloadFile(url, fileName) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            link.click();
+        }
+
+        document.getElementById('btn-generate').addEventListener('click', generate);
+        document.getElementById('btn-export').addEventListener('click', exportData);
+
+        window.onload = generate;
+    </script>
+</body>
+
+</html>
